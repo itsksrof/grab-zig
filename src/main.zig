@@ -4,16 +4,6 @@ const mem = @import("std").mem;
 const heap = @import("std").heap;
 const fs = @import("std").fs;
 
-// ! Part One (Command arguments)
-// * Get the command arguments
-// * Print the command arguments
-// * Use the first command argument to determine which function should be executed
-
-// ! Part Two (Reading a file)
-// * Open a file
-// * Read the contents of the file
-// * Output its contents
-
 pub fn main() !void {
     // Get the command arguments, using std.os.argv
     // This solution will not work for WASI or Windows
@@ -25,13 +15,16 @@ pub fn main() !void {
         // Convert arg to []u8 and compare it using mem.eql
         const val: []u8 = arg[0..mem.len(arg)];
         if ((mem.eql(u8, val, "--help") or mem.eql(u8, val, "-h"))) {
-            return debug.print("deez nuts\n", .{});
+            return debug.print("{s}\n", .{get_help()});
         } else {
             // Create a general purpose allocator
             var gpa = heap.GeneralPurposeAllocator(.{}){};
             defer _ = gpa.deinit();
             const allocator = gpa.allocator();
 
+            // TODO: This should be a function
+            // TODO: Need to learn about zig error handling
+            // TODO: Need to learn about zig allocator
             // Open a file in the current working directory
             var file = try fs.cwd().openFile(val, .{});
 
@@ -42,4 +35,19 @@ pub fn main() !void {
             debug.print("{!s}\n", .{file_content});
         }
     }
+}
+
+// get_help returns an example of how this program might be used
+fn get_help() []const u8 {
+    return 
+    \\Usage: grab [OPTION] ... [FILE] ...
+    \\Grab FILE(s) content and show it through standard output
+    \\
+    \\--help, -h            display this help and exit
+    \\
+    \\Examples:
+    \\
+    \\grab foo.txt          Output 'foo.txt' contents
+    \\grab foo.txt bar.txt  Output 'foo.txt' contents, then, output 'bar.txt' contents
+    ;
 }
