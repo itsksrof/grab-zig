@@ -10,6 +10,12 @@ pub fn main() !void {
     // use std.process.argsAlloc for a cross-platform solution
     const argv = os.argv;
 
+    // Create a general purpose allocator to be used
+    // when reading the contents of the given file(s)
+    var galloc = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = galloc.deinit();
+    const allocator = galloc.allocator();
+
     // Use the first command argument to determie which function should be executed
     for (argv[1..]) |arg| {
         // Convert arg to []u8 and compare it using mem.eql
@@ -17,22 +23,10 @@ pub fn main() !void {
         if ((mem.eql(u8, val, "--help") or mem.eql(u8, val, "-h"))) {
             return debug.print("{s}\n", .{get_help()});
         } else {
-            // Create a general purpose allocator
-            var gpa = heap.GeneralPurposeAllocator(.{}){};
-            defer _ = gpa.deinit();
-            const allocator = gpa.allocator();
-
-            // TODO: This should be a function
-            // TODO: Need to learn about zig error handling
-            // TODO: Need to learn about zig allocator
-            // Open a file in the current working directory
-            var file = try fs.cwd().openFile(val, .{});
-
-            // Read the contents of the file
-            const file_content = try file.readToEndAlloc(allocator, 10 * 1024 * 1024); // 10MB max read
+            // Read the contents of the given file and defer its deallocation
+            const file_content = try get_file_content(allocator, val);
             defer allocator.free(file_content);
-
-            debug.print("{!s}\n", .{file_content});
+            debug.print("{s}\n", .{file_content});
         }
     }
 }
@@ -43,11 +37,20 @@ fn get_help() []const u8 {
     \\Usage: grab [OPTION] ... [FILE] ...
     \\Grab FILE(s) content and show it through standard output
     \\
-    \\--help, -h            display this help and exit
     \\
+    \\--help, -h            display this help and exit
     \\Examples:
     \\
     \\grab foo.txt          Output 'foo.txt' contents
     \\grab foo.txt bar.txt  Output 'foo.txt' contents, then, output 'bar.txt' contents
     ;
+}
+
+// get_file_content returns the contents of the given file or an error string
+fn get_file_content(allocator: mem.Allocator, path: []u8) ![]u8 {
+    // Open a file in the current working directory
+    var file = try fs.cwd().openFile(path, .{});
+
+    // Read and return the contents of the file
+    return try file.readToEndAlloc(allocator, 10 * 1024 * 1024);
 }
