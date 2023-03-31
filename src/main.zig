@@ -3,6 +3,7 @@ const os = @import("std").os;
 const mem = @import("std").mem;
 const heap = @import("std").heap;
 const fs = @import("std").fs;
+const testing = @import("std").testing;
 
 pub fn main() !void {
     // Get the command arguments, using std.os.argv
@@ -19,7 +20,7 @@ pub fn main() !void {
     // Use the first command argument to determie which function should be executed
     for (argv[1..]) |arg| {
         // Convert arg to []u8 and compare it using mem.eql
-        const val: []u8 = arg[0..mem.len(arg)];
+        const val: []const u8 = arg[0..mem.len(arg)];
         if ((mem.eql(u8, val, "--help") or mem.eql(u8, val, "-h"))) {
             return debug.print("{s}\n", .{get_help()});
         } else {
@@ -47,10 +48,32 @@ fn get_help() []const u8 {
 }
 
 // get_file_content returns the contents of the given file or an error string
-fn get_file_content(allocator: mem.Allocator, path: []u8) ![]u8 {
+fn get_file_content(allocator: mem.Allocator, path: []const u8) ![]u8 {
     // Open a file in the current working directory
     var file = try fs.cwd().openFile(path, .{});
 
     // Read and return the contents of the file
     return try file.readToEndAlloc(allocator, 10 * 1024 * 1024);
+}
+
+test "get file contents" {
+    // Create a general purpose allocator
+    var galloc = heap.GeneralPurposeAllocator(.{}){};
+    defer _ = galloc.deinit();
+    const allocator = galloc.allocator();
+
+    // Create and write to 'foo.txt'
+    var file = try fs.cwd().createFile("foo.txt", .{});
+    _ = try file.write("foo");
+
+    // Read the contents of 'foo.txt'
+    var path: []const u8 = "foo.txt";
+    const file_content = try get_file_content(allocator, path);
+    defer allocator.free(file_content);
+
+    // Assert that 'foo.txt' contains 'foo'
+    try testing.expectEqualStrings("foo", file_content);
+
+    // Remove 'foo.txt'
+    try fs.cwd().deleteFile("foo.txt");
 }
